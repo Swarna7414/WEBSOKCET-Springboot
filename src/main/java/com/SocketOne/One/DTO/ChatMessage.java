@@ -1,5 +1,6 @@
 package com.SocketOne.One.DTO;
 
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,5 +13,5 @@ import lombok.Setter;
 public class ChatMessage {
     private String sender;
     private String content;
-    private String timeStamp;
+    private String timestamp;
 }
