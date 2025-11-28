@@ -1,42 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live Logs</title>
+    <title>Public Chat Room</title>
+
+
+    <script src="/js/stomp.min.js"></script>
+
+
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stompjs@2/dist/stomp.min.js"></script>
+
 </head>
 <body>
 
-<h2>Live Server Logs</h2>
+<h2>Public Chat Room</h2>
 
-<div id="logArea" style="border:1px solid #aaa; padding:10px; height:300px; overflow-y:auto;"></div>
+<div>
+    <label>
+        Your Name:
+        <input id="nameInput" type="text" placeholder="Enter your name">
+    </label>
+</div>
+
+<br>
+
+<div>
+    <input id="messageInput" type="text" placeholder="Type your message..." style="width:300px;">
+    <button onclick="sendMessage()">Send</button>
+</div>
+
+<hr>
+
+<ul id="messages" style="list-style: none; padding: 0;"></ul>
 
 <script>
-    let socket = new SockJS('/ws');
-    let stompClient = Stomp.over(socket);
+    console.log("Stomp is:", typeof Stomp); // Debug check
 
-    // Add connection status element
-    const statusDiv = document.createElement('div');
-    statusDiv.id = 'connectionStatus';
-    statusDiv.style.marginBottom = '10px';
-    statusDiv.innerHTML = 'Status: <b>Connecting...</b>';
-    document.body.insertBefore(statusDiv, document.getElementById('logArea').previousElementSibling);
+    let stompClient = null;
 
-    stompClient.connect({}, function (frame) {
-        document.getElementById('connectionStatus').innerHTML = 'Status: <b style="color:green">Connected</b>';
-        console.log('Connected: ' + frame);
-        
-        stompClient.subscribe('/topic/logs', function (message) {
-            let log = JSON.parse(message.body);
-            let logArea = document.getElementById("logArea");
-            logArea.innerHTML += `<div><b>${log.timestamp}</b>: ${log.text}</div>`;
-            logArea.scrollTop = logArea.scrollHeight; // Auto-scroll to bottom
+    // Connect to /ws WebSocket endpoint
+    const socket = new SockJS('/ws');
+    stompClient = Stomp.over(socket);
+
+    // Connect STOMP client
+    stompClient.connect({}, function () {
+
+        console.log("Connected to WebSocket");
+
+        // Subscribe to the public chat topic
+        stompClient.subscribe('/topic/public', function (message) {
+
+            const chat = JSON.parse(message.body);
+            if (!chat) return;
+
+            let li = document.createElement("li");
+            li.innerHTML = `<b>${chat.sender}</b> [${chat.timestamp}] : ${chat.content}`;
+            document.getElementById("messages").appendChild(li);
         });
-    }, function(error) {
-        document.getElementById('connectionStatus').innerHTML = 'Status: <b style="color:red">Disconnected</b> - ' + error;
-        console.error('STOMP error:', error);
-        document.getElementById("logArea").innerHTML += `<div style="color:red"><b>Error:</b> Could not connect to WebSocket server.</div>`;
+
     });
+
+    // Send message function
+    function sendMessage() {
+
+        // Ensure WebSocket is connected
+        if (!stompClient || !stompClient.connected) {
+            alert("WebSocket not connected yet!");
+            return;
+        }
+
+        const name = document.getElementById("nameInput").value.trim() || "Anonymous";
+        const content = document.getElementById("messageInput").value.trim();
+
+        if (content === "") return; // Do not send empty messages
+
+        const chatMessage = {
+            sender: name,
+            content: content
+        };
+
+        // Send message to backend
+        stompClient.send("/app/chat.send", {}, JSON.stringify(chatMessage));
+
+        document.getElementById("messageInput").value = "";
+    }
 </script>
 
 </body>

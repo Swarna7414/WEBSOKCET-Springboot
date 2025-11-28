@@ -1,4 +1,4 @@
-package com.SocketOne.One.Model;
+package com.SocketOne.One.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,12 +7,10 @@ import lombok.Setter;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
 @Setter
-public class LogMessage {
-
-    private String timestamp;
-
-    private String text;
-
+@Getter
+public class ChatMessage {
+    private String sender;
+    private String content;
+    private String timeStamp;
 }
