@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Notifications</title>
+</head>
+<body>
+<h1>Task Notification Center</h1>
+
+<div>
+    <label>Project ID to subscribe:
+        <input type="number" id="projectIdInput" value="1">
+    </label>
+    <button onclick="connect()">Connect & Subscribe</button>
+</div>
+
+<ul id="notifications"></ul>
+
+<!-- SockJS & STOMP libraries from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+
+            // Global subscription
+            stompClient.subscribe('/topic/tasks', function (message) {
+                showNotification(JSON.parse(message.body), "GLOBAL");
+            });
+
+            // Project-specific subscription
+            const projectId = document.getElementById('projectIdInput').value;
+            if (projectId) {
+                const destination = '/topic/tasks.' + projectId;
+                stompClient.subscribe(destination, function (message) {
+                    showNotification(JSON.parse(message.body), "PROJECT " + projectId);
+                });
+            }
+        });
+    }
+
+    function showNotification(notification, from) {
+        const list = document.getElementById('notifications');
+        const li = document.createElement('li');
+        li.textContent =
+            '[' + from + '] Task ' + notification.taskId +
+            ' (' + notification.title + ') ' +
+            notification.action +
+            ' [status=' + notification.status + ', project=' + notification.projectId + ']';
+        list.prepend(li); // newest on top
+    }
+</script>
+</body>
+</html>
