@@ -2,30 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WebSocket Chat – Broadcast + DM</title>
+    <title>WebSocket Chat – Broadcast + DM + Online Users</title>
 
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="/js/stomp.min.js"></script>
 
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        #messages, #errors, #privateMessages { list-style: none; padding-left: 0; }
+        #messages, #errors, #privateMessages, #onlineUsers {
+            list-style: none;
+            padding-left: 0;
+        }
         #messages li { margin-bottom: 4px; }
         #privateMessages li { margin-bottom: 4px; color: darkgreen; }
         #errors li { margin-bottom: 4px; color: red; }
+        #onlineUsers li { margin-bottom: 2px; color: blue; }
         .row { margin-bottom: 10px; }
         fieldset { margin-top: 15px; }
     </style>
 </head>
 <body>
 
-<h2>Spring WebSocket Practice – Broadcast + Direct Messages</h2>
+<h2>Spring WebSocket – Broadcast + DM + Online Users</h2>
 
 <div class="row">
     <label>Your username: </label>
     <input type="text" id="currentUser" value="Harshith">
     <button onclick="reconnect()">Set / Reconnect</button>
 </div>
+
+<h3>Online Users</h3>
+<ul id="onlineUsers"></ul>
 
 <fieldset>
     <legend>Broadcast Chat (/topic/messages)</legend>
@@ -62,9 +69,10 @@
     function connect(username) {
         const socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
-        stompClient.debug = null; // silence logs
+        stompClient.debug = null; // disable STOMP logs
 
-        stompClient.connect({}, function (frame) {
+        // send username as header to server
+        stompClient.connect({ username: username }, function (frame) {
             console.log('Connected: ' + frame);
             currentUser = username;
 
@@ -85,6 +93,12 @@
             stompClient.subscribe(privateDestination, function (messageFrame) {
                 const body = JSON.parse(messageFrame.body);
                 showPrivate(body);
+            });
+
+            // 4) Online users list
+            stompClient.subscribe('/topic/online-users', function (frame) {
+                const users = JSON.parse(frame.body); // array of strings
+                showOnlineUsers(users);
             });
 
         }, function (error) {
@@ -152,6 +166,16 @@
         const li = document.createElement('li');
         li.innerText = err.error;
         document.getElementById('errors').appendChild(li);
+    }
+
+    function showOnlineUsers(users) {
+        const list = document.getElementById('onlineUsers');
+        list.innerHTML = '';
+        users.forEach(u => {
+            const li = document.createElement('li');
+            li.innerText = u;
+            list.appendChild(li);
+        });
     }
 
     window.addEventListener('load', function () {
