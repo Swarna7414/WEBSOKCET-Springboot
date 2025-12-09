@@ -2,81 +2,70 @@ package com.SocketOne.One.Controller;
 
 import com.SocketOne.One.DTO.ChatMessage;
 import com.SocketOne.One.DTO.ErrorMessage;
-import com.SocketOne.One.DTO.MessageType;
-import com.SocketOne.One.DTO.PrivateMessage;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.stereotype.Controller;
 
-import java.time.Instant;
-import java.util.stream.Collectors;
-
-
+@Controller
 public class ChatController {
-
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate simpMessagingTemplate;
 
-    public ChatController(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
+
+    public ChatController(SimpMessagingTemplate simpMessagingTemplate) {
+        this.simpMessagingTemplate = simpMessagingTemplate;
     }
 
 
-    @MessageMapping("/chat.send")
-    @SendTo("/topic/messages")
-    public ChatMessage sendBroadCast(@Valid @Payload ChatMessage message){
-        logger.info("BroadCast Message from {} to {}", message.getSender() , message.getContent());
-        message.setTimestamp(Instant.now());
+    @MessageMapping("/chat.public")
+    @SendTo("/topic/public")
+    public ChatMessage sendPublicMessage(@Payload ChatMessage chatMessage){
+        validateMessage(chatMessage);
+        logger.info("Public message from {}: {}",chatMessage.getSender(),chatMessage.getContent());
+        return chatMessage;
+    }
 
-        if (message.getType() == null){
-            message.setType(MessageType.CHAT);
+
+    @MessageMapping("/chat.private")
+    public void sendPrivateMessage(@Payload ChatMessage chatMessage){
+        validateMessage(chatMessage);
+        if (chatMessage.getReceiver() == null  || chatMessage.getReceiver().isBlank()){
+            throw new IllegalArgumentException("Sender Must not be empty");
         }
 
-        return message;
-    }
+        logger.info("Message to private Person from {} to {} and message {}",chatMessage.getSender(), chatMessage.getReceiver(), chatMessage.getContent());
 
-
-    @MessageMapping("private-message")
-    public void SendPrivatemessage(PrivateMessage message){
-        message.setTimestamp(Instant.now());
-
-        String destination = "/user/"+message.getRecipient()+"/queue/messages";
-
-        logger.info("Message was sent to {} form {}",message.getRecipient(), message.getSender());
-
-        messagingTemplate.convertAndSend(destination, message);
-
-    }
-
-    @MessageExceptionHandler(MethodArgumentNotValidException.class)
-    @SendTo("/queue/errors")
-    public ErrorMessage handleValidationError(MethodArgumentNotValidException exception){
-
-        String errors = exception.getBindingResult().getAllErrors().stream().map(DefaultMessageSourceResolvable::getDefaultMessage)
-                .collect(Collectors.joining(", "));
-
-        logger.info("Validation Error : {}", errors);
-
-        return new ErrorMessage(errors);
-    }
-
-
-    @MessageExceptionHandler(Exception.class)
-    @SendTo("/queue/errors")
-    public ErrorMessage handleErrorMessage(Exception exception){
-        logger.info("Unexpected Error", exception);
-        return new ErrorMessage(
-                "Server Error " + exception.getClass().getSimpleName() + " - " + exception.getMessage()
+        simpMessagingTemplate.convertAndSend(
+                "/queue/private." + chatMessage.getReceiver(),
+                chatMessage
         );
     }
+
+    @MessageExceptionHandler
+    @SendToUser("/queue/errors")
+    public ErrorMessage handleErrorMessage(Exception exception){
+        logger.error("WebSocket Error",exception);
+        return new ErrorMessage("Error"+exception.getMessage());
+    }
+
+
+    private void validateMessage(ChatMessage message) {
+        if (message.getSender() == null || message.getSender().isBlank()){
+            throw new IllegalArgumentException("Sender cannot be empty");
+        }
+        if (message.getContent() == null || message.getContent().isBlank()){
+            throw new IllegalArgumentException("Content can't be empty");
+        }
+
+    }
+
 
 
 }
